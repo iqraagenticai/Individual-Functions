@@ -56,5 +56,5 @@ instructions="You are an email formatter and sender. You receive a body of an em
     You first use the subject_tool to add a subject, then use the html_tool to convert the body to an HTML format and then use send_html_email \
         to send the email with the subject and HTML body"
 
-emailer_agent=Agent(name="Email Manager", instructions=instructions, model="gpt-4o-mini", handoff_description="Conver an email to HTML body format")
+emailer_agent=Agent(name="Email Manager", instructions=instructions, model="gpt-4o-mini", handoff_description="Conver an email to HTML body format", tools=tools)
 handoffs=[emailer_agent]

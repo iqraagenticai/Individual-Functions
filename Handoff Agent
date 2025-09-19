@@ -59,3 +59,60 @@ instructions="You are an email formatter and sender. You receive a body of an em
 
 emailer_agent=Agent(name="Email Manager", instructions=instructions, model="gpt-4o-mini", handoff_description="Conver an email to HTML body format", tools=tools)
 handoffs=[emailer_agent]
+
+#now you can use previous email manager and send email using handoff
+instructions1= "You are a Professional sales agent from the company called Iqra Agentic AI soltions. Offer AI solutions to the potential\
+      You write professional, serious cold emails."
+instructions2="You are a funny sales agent from the company called Iqra Agentic AI soltions. Offer AI solutions to the potential\
+     You write Humourous cold emails. "
+instructions3="You are a engaging and busy sales agent from the company called Iqra Agentic AI soltions. Offer AI solutions to the potential\
+     You write engaging cold emails that are like to get a resposne. "
+
+sales_agent1=Agent(
+    name="professional Sales Agent",
+    instructions=instructions1,
+    model= "gpt-4o-mini"
+)
+
+sales_agent2=Agent(
+    name="Humourou Sales Agent",
+    instructions=instructions2,
+    model="gpt-4o-mini"
+)
+
+sales_agent3= Agent(
+    name="Busy Sales Agent",
+    instructions=instructions3,
+    model="gpt-4o-mini"
+)
+#you can also convert agents as tool using the syntax as tool. It is shown below
+description="Write a cold sales email"
+
+tool1=sales_agent1.as_tool(tool_name="sales_agent1", tool_description=description)
+tool2=sales_agent2.as_tool(tool_name="sales_agent2", tool_description=description)
+tool3=sales_agent3.as_tool(tool_name="sales_agent3", tool_description=description)
+
+tools=[tool1, tool2, tool3, send_email]
+
+#end of tools creations.
+sales_manager_instructions = """
+You are a Sales Manager at Iqra Agentic AI soltions. Your goal is to find the single best cold sales email using the sales_agent tools.
+ 
+Follow these steps carefully:
+1. Generate Drafts: Use all three sales_agent tools to generate three different email drafts. Do not proceed until all three drafts are ready.
+ 
+2. Evaluate and Select: Review the drafts and choose the single best email using your judgment of which one is most effective.
+You can use the tools multiple times if you're not satisfied with the results from the first try.
+ 
+3. Handoff for Sending: Pass ONLY the winning email draft to the 'Email Manager' agent. The Email Manager will take care of formatting and sending.
+ 
+Crucial Rules:
+- You must use the sales agent tools to generate the drafts — do not write them yourself.
+- You must hand off exactly ONE email to the Email Manager — never more than one.
+"""
+
+sales_manager=Agent(name="Sales_manager", instructions=sales_manager_instructions, model="gpt-4o-mini", tools=tools, handoffs=handoffs)
+message_or_instructions="Send out a cold sales email addressed o Dear CEO from Alice"
+
+with trace("Automated SDR"):
+    result=await Runner.run(sales_manager,message)

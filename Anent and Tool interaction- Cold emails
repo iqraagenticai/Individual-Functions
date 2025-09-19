@@ -52,3 +52,6 @@ def send_email(body:str):
 
 #the below command will not send email since it has been converted as a fucntion tool for the agent
 send_email
+
+
+#you can also convert agents as tool using the syntax as tool. It is shown below

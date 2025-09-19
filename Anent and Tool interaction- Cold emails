@@ -33,3 +33,22 @@ sales_agent3= Agent(
     instructions=instructions3,
     model="gpt-4o-mini"
 )
+
+#creating a tool using function_tool
+# @function_tool is used on top of a fucntion because this fucnction gets added to the same Agent object and acts as additional 
+
+@function_tool
+def send_email(body:str):
+    """ send out an email with the given body to all sales prospects"""
+    sg=sendgrid.SendGridAPIClient(api_key=os.environ.get("SENDGRID_API_KEY"))
+    from_email= Email("iqra@iqratech.site")
+    to_email=To("iqraagenticai@gmail.com")
+    content=content("text/plain", body)
+
+    #add the send email command
+    mail=Mail(from_email, to_email,"Sales Email",content).get()
+    response = sg.client.mail.send.post(request_body=mail)
+    return {"Status": "Success"}
+
+#the below command will not send email since it has been converted as a fucntion tool for the agent
+send_email

@@ -41,3 +41,30 @@ async for event in result.stream_events():
     if event.type == "raw_response_event" and isinstance(event.data, ResponseTextDeltaEvent):
         print(event.data.delta, end="", flush=True)
 
+message="Write a cold sale email"
+
+
+#lets choose the best email using a picker
+sales_picker=Agent(
+    name="sales_pikcer",
+    instructions="You pick the best cold sales email from the given options. \
+        Imagine you are a customer and pick one that you are most like to reseponse to. \
+            Do not give any explaination; reply with the selected email only",
+    model="gpt-4o-mini"
+)
+
+
+#Trace all the things using sales picker separately.
+with trace("selection from sales people"):
+    results=await asyncio.gather(
+        Runner.run(sales_agent1, message),
+        Runner.run(sales_agent2, message),
+        Runner.run(sales_agent3, message)
+    )
+    outputs=[result.final_output for result in results]
+
+    emails="Cold Sales Emails:\n\n".join(outputs)
+
+    best= await Runner.run(sales_picker, emails)
+
+    print(f"Best email is :\n {best.final_output}")

@@ -1,0 +1,29 @@
+#handoff
+# lets create 2 agents 1 to write a subject of an email and 1 to covert the email in HTML format.
+#convert both agents as tools using .as_tool construct.
+from dotenv import load_dotenv
+from openai import OpenAI
+from agents import Agent, trace, Runner, function_tool
+import os
+import html
+import sendgrid
+from sendgrid import from_email
+
+#lets create the machine instructions
+subject_instruction="You can write a subject for a cold sales email.\
+    You are given a message and you need to write a subject for an email that is likely to get a response."
+
+html_instruction="You can convert a text email boxy to an HTML email body.\
+    You are given a text email body which might have some markdown and you \
+        need to convert it to an html email body with simple, clear, compelling layout and design."
+
+subject_agent=Agent(name="subject_agent",instructions=subject_instruction, model="gpt-4o-mini")
+html_agent=Agent(name="html_agent", instructions=html_instruction, model="gpt-4o-mini")
+
+
+#convert the agents to tools using as_tools
+import html
+
+
+subject_tool=subject_agent.as_tool(tool_name="subject_agent", tool_description="Write a subject for a cold sales email")
+html_tool=html_agent.as_tool(tool_name="html_agent", tool_description="Convert a text email body to an HTML email body")

@@ -1,7 +1,10 @@
 #import the following things.
 
 from agents import Agent,Runner,trace
+from agents import function_tool
 import asyncio
+
+#ResponseTextDeltaEvent stream back text
 from openai.types.responses import ResponseTextDeltaEvent
 
 #Creating and calling Agents

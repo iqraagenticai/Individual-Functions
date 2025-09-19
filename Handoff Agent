@@ -27,3 +27,25 @@ import html
 
 subject_tool=subject_agent.as_tool(tool_name="subject_agent", tool_description="Write a subject for a cold sales email")
 html_tool=html_agent.as_tool(tool_name="html_agent", tool_description="Convert a text email body to an HTML email body")
+
+
+@function_tool
+def send_html_email(subject: str, html_body: str):
+    #below is the tool descriotion.
+    """ Send out an email with the given subject and html body to all sales prospects """
+    from_email=Email("Test@iqratech.site")
+    to_email=To("Testrecepient@gmail.com")
+    content=Content("text/plan", html_body)
+    sg=sendgrid.SendGridAPIClient(api_key=os.environ.get('SENDGRID_API_KEY'))
+    #trying a new method in sendgrid
+    mail=Mail(from_email, to_email, subject, content)
+    response = sg.send(mail)
+    return {"Status": response.status_code}
+
+
+    # mail=Mail(from_email="iqra@iqratech.site", to_emails="iqraagenticai@gmail.com", subject=subject, plain_text_content=html_body).get()
+    # response=sg.client.mail.send.post(request_body=mail)
+    # return {"status":"success"}
+
+
+tools=[subject_tool, html_tool, send_html_email]

@@ -8,6 +8,7 @@ import os
 import html
 import sendgrid
 from sendgrid import from_email
+from agents import handoff_span, handoffs
 
 #lets create the machine instructions
 subject_instruction="You can write a subject for a cold sales email.\
@@ -49,3 +50,11 @@ def send_html_email(subject: str, html_body: str):
 
 
 tools=[subject_tool, html_tool, send_html_email]
+
+#lets create a handoff
+instructions="You are an email formatter and sender. You receive a body of an email to be sent.\
+    You first use the subject_tool to add a subject, then use the html_tool to convert the body to an HTML format and then use send_html_email \
+        to send the email with the subject and HTML body"
+
+emailer_agent=Agent(name="Email Manager", instructions=instructions, model="gpt-4o-mini", handoff_description="Conver an email to HTML body format")
+handoffs=[emailer_agent]

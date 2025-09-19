@@ -1,5 +1,10 @@
 # to send an email using Sendgrid api, save the env key in the .env file.
 # sg = sendgrid.SendGridAPIClient(api_key=os.environ.get('SENDGRID_API_KEY'))
+
+import sendgrid
+from sendgrid.helpers.mail import Mail, Email, To, Content
+
+
 def send_test_email():
     sg = sendgrid.SendGridAPIClient(api_key=os.environ.get('SENDGRID_API_KEY'))
     from_email = Email("From_email_ID@iqratech.site")  # Change to your verified sender

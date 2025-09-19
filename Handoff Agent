@@ -49,6 +49,7 @@ def send_html_email(subject: str, html_body: str):
     # return {"status":"success"}
 
 
+#use this in the handoff
 tools=[subject_tool, html_tool, send_html_email]
 
 #lets create a handoff

@@ -55,3 +55,26 @@ send_email
 
 
 #you can also convert agents as tool using the syntax as tool. It is shown below
+description="Write a cold sales email"
+
+tool1=sales_agent1.as_tool(tool_name="sales_agent1", tool_description=description)
+tool2=sales_agent2.as_tool(tool_name="sales_agent2", tool_description=description)
+tool3=sales_agent3.as_tool(tool_name="sales_agent3", tool_description=description)
+
+tools=[tool1, tool2, tool3, send_email]
+
+
+
+#using another agent, use the previous convered tools and added tool as tools to the new agent and perform a task
+instructions="You are a sales manager. You use the tools given to you to generate cold sales emails.\
+    You can generate sales emails yourself but you always use the tools\
+        you try all 3 sales_agents tools once before choosing the best one.\
+            you pick the single best email and use the send_email tool to send the best email to the user"
+
+sales_manager=Agent(name="Sales Manager", instructions=instructions, model="gpt-4o-mini", tools=tools)
+
+message="Send a cold sales email addressed to 'Dear CEO'"
+
+with trace("Sales Manager Email"):
+    result=await Runner.run(sales_manager, message)
+

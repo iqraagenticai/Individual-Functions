@@ -42,7 +42,7 @@ def send_email(body:str):
     """ send out an email with the given body to all sales prospects"""
     sg=sendgrid.SendGridAPIClient(api_key=os.environ.get("SENDGRID_API_KEY"))
     from_email= Email("iqra@iqratech.site")
-    to_email=To("iqraagenticai@gmail.com")
+    to_email=To("iqraagenticaitest@gmail.com")
     content=content("text/plain", body)
 
     #add the send email command

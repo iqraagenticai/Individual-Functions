@@ -1,0 +1,193 @@
+# Agents SDK has agent to create agents, trace to trace the function, Runner to run, function_tool to convert a func to a tool that can be passed
+# to an agent, OpenAIChatCompletionsModel that takes model and client as argument, input guardrail to check inputs and output.
+from agents import Agent, trace, Runner, function_tool, OpenAIChatCompletionsModel,input_guardrail, GuardrailFunctionOutput
+
+from agents import handoff
+# To get envvaariables
+import os, asyncio
+
+# To use OpenAI model and AsyncOpenAI another class used for other LLMs
+from openai import OpenAI, AsyncOpenAI
+
+# To load env variables from .env file
+from dotenv import load_dotenv
+
+# to use DICtionary format
+from typing import Dict
+
+# Using sendgrid to send emails in the below example you can use your own and their own functions.
+from sendgrid.helpers.mail import Mail, Email, To, From, Content, Bcc
+import sendgrid
+
+# The pydantec BaseModel is used to define an output schema in the function
+from pydantic import BaseModel
+
+
+
+# Load environment variables
+load_dotenv()
+
+
+# I'm going to use 2 LLMs OpenAI and LLama 3.2 from ollama
+
+ollama_base_url = "http://localhost:11434/v1"
+ollama_api_key = "ollama"
+ollama_client = AsyncOpenAI(base_url=ollama_base_url, api_key=ollama_api_key)
+ollama_chat_client=OpenAIChatCompletionsModel(model="llama3.2", openai_client=ollama_client)
+
+# # Below id openAI gpt example 
+# """openai=OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# OpenAI_Client=OpenAIChatCompletionsModel(model="gpt-4o-mini",openai_client=openai)"""
+
+
+# Creating agents now
+instructions1="YOu are a Busy Sales agent working for Iqra Tech AI Solutions, you must send  a cold sales email enaging the potential\
+    customer and likely to get a response."
+
+instructions2="You are a funny sales agent working for Iqra Tech AI Solutions, You must send a cold sales email\
+     cracking jokes but also explaining about the company to the customer."
+
+instruct="Write a cold sales email"
+
+Agent1=Agent(name="Ollama_agent", instructions=instructions1, model=ollama_chat_client)
+Agent2=Agent(name="ChatGpt_agent", instructions=instructions2, model="gpt-4o-mini")
+
+Agent1_tool=Agent1.as_tool(tool_name="Agent1_tool",tool_description="Write a cold sales email using ollama LLM")
+Agent2_tool=Agent2.as_tool(tool_name="Agent2_tool",tool_description="Wite a cold sales email using chatgpt 4o model")
+
+email_tools=[Agent1_tool,Agent2_tool]
+# Email formatter agents converted as tools
+subject_instructions = "You can write a subject for a cold sales email. \
+You are given a message and you need to write a subject for an email that is likely to get a response."
+
+html_instructions = "You can convert a text email body to an HTML email body. \
+You are given a text email body which might have some markdown \
+and you need to convert it to an HTML email body with simple, clear, compelling layout and design."
+
+signature_intructions="You can add a signature to an html email. Best Regards, Sales Team Manager, Iqra AI Tech Solutions.\
+    You do not need to add anything else or any other line apart from this but you can add a ame if advised."
+
+subject_agent=Agent(name="Subject_agent", instructions=subject_instructions, model="gpt-4o-mini")
+html_agent=Agent(name="html_agent", instructions=html_instructions,model="gpt-4o-mini")
+sign_agent=Agent(name="sign_agent", instructions=signature_intructions,model="gpt-4o-mini")
+
+subject_tool=subject_agent.as_tool(tool_name="subject_agnet", tool_description= "Write a subject line to an email")
+html_tool=html_agent.as_tool(tool_name="html_agent", tool_description="Convert the email body into HTML format")
+sign_tool=sign_agent.as_tool(tool_name="sign_agent", tool_description="Add a signature to the html email body")
+
+
+
+
+# Create a function tool that takes all the email formatting tools as tools so they are hidden
+
+
+@function_tool
+def send_html_email(subject: str, html_body:str)-> Dict[str, str]:
+     """ Send out an email with the given subject and HTML body to all sales prospects """
+     sg=sendgrid.SendGridAPIClient(api_key=os.environ.get('SENDGRID_API_KEY'))
+     from_email=From("iqra@iqratech.site")
+     to_eamil=To("iqraagenticaitest@gmail.com")
+    #  bcc_email=BcC("mohammednadeem86@gmail.com")
+     content=Content("text/html",html_body)
+     mail=Mail(from_email, to_eamil, subject, content).get()
+     sg.client.mail.send.post(request_body=mail)
+     return {"status": "success"}
+
+
+# Create a list called email_format and add these tools
+email_format_tools=[subject_tool, html_tool, sign_tool, send_html_email]
+
+# Add another agent that will use all these email format tools
+Email_formatter_agent=Agent(
+    name="email_formatter_sender", 
+    instructions="Format email using tools provided and send a cold sales email", 
+    tools=email_format_tools,
+    model="gpt-4o-mini")
+
+
+# lets create this email formatter agent as handoff that accepts the control and ends the flow.
+email_handoff=[Email_formatter_agent]
+
+#now time to add an input guardrail
+# First create a class of BaseModel
+
+class guard_check(BaseModel):
+    is_name_found: bool
+    found_name: str
+
+# Create an agent to give the output
+guard_agent=Agent(
+    name="Guard Agent",
+    model="gpt-4o-mini",
+    instructions="Check if the input of the user contains personal names in what you want to do",
+    output_type=guard_check
+)
+
+# Lets create a function and make it a input guardrail
+
+@input_guardrail
+async def guardrail_func(ctx, agent, message):
+
+     # Run the agent in this such as superevisor checking the xray machine and turning it on.
+    result=await Runner.run(guard_agent, message, context=ctx.context)
+
+     # Check if name exist and return the name
+    is_name_found=result.final_output.is_name_found # Check if name exist and return the name
+    found_name=result.final_output
+    return GuardrailFunctionOutput(output_info=found_name, tripwire_triggered=is_name_found)
+
+
+
+# Now lets create a sales manager who can use the tools first to create emails and then hand off to 
+# to the email formatter to format it
+sales_manager_instructions = """
+You are a Sales Manager at Iqra Tech AI Solutions. Your goal is to find the single best cold sales email using the sales_agent tools.
+ 
+Follow these steps carefully:
+1. Generate Drafts: Use both sales_agent tools to generate 2 different email drafts. Do not proceed until both drafts are ready.
+ 
+2. Evaluate and Select: Review the drafts and choose the single best email using your judgment of which one is most effective.
+You can use the tools second time if you're not satisfied with the results from the first try.
+ 
+3. Handoff for Sending: Pass ONLY the winning email draft to the 'Email Manager' agent. The Email Manager will take care of formatting and sending.
+ 
+Crucial Rules:
+- You must use the sales agent tools to generate the drafts — do not write them yourself.
+- You must hand off exactly ONE email to the Email Manager — never more than one."""
+
+sales_Manager_agent=Agent(
+    name="Sales manager",
+    model="gpt-4o-mini",
+    instructions=sales_manager_instructions,
+    tools=email_tools,
+    handoffs=email_handoff,
+    input_guardrails=[guardrail_func]
+)
+
+async def main():
+    #this will fail as the tripwire will be triggered as the name Nadeem in it.
+     message = "Send a cold sales email from Nadeem to CEO"
+    #message="send a cold sales email from sales department of Iqratech solutions"
+     with trace("Testing guardrail function"):
+        result = await Runner.run(sales_Manager_agent, message)
+     return result
+
+# Run the async function
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())
+# The below testing the handoff only
+# # Main execution function
+# async def main():
+
+#     #this will fail as the tripwire will be triggered as the name Nadeem in it.
+#     message = "Send a cold sales email from Nadeem to CEO"
+#     with trace("Testing Handoff Final"):
+#         result = await Runner.run(sales_Manager_agent, message)
+#         print(result)
+#         return result
+
+
+
+
+#The below testing the guardrail

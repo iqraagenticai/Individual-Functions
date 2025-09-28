@@ -166,11 +166,22 @@ sales_Manager_agent=Agent(
 
 async def main():
     #this will fail as the tripwire will be triggered as the name Nadeem in it.
-     message = "Send a cold sales email from Nadeem to CEO"
-    #message="send a cold sales email from sales department of Iqratech solutions"
-     with trace("Testing guardrail function"):
-        result = await Runner.run(sales_Manager_agent, message)
-     return result
+    message1 = "Send a cold sales email from Nadeem to CEO"
+    message2="send a cold sales email from sales department of Iqratech solutions"
+
+    try:
+     with trace("Testing guardrail function with name"):
+        result = await Runner.run(sales_Manager_agent, message1)
+        print(result.final_output)
+    except Exception as e:
+        print(result.final_output)
+    
+    try:
+        with trace("Testing without name")
+        result=await Runner.run(sales_Manager_agent, message2)
+        print(result.final_output)
+    except Exception as e:
+        print(result.final_output)
 
 # Run the async function
 if __name__ == "__main__":

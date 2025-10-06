@@ -1,0 +1,279 @@
+import os
+import json
+from openai import OpenAI
+from dotenv import load_dotenv
+from typing import List, Dict, Tuple
+
+
+def initialize_environment() -> None:
+    """Load environment variables from .env file."""
+    load_dotenv(override=True)
+
+
+def create_openai_client() -> OpenAI:
+    """Create and return an OpenAI client instance."""
+    return OpenAI()
+
+
+def create_deepseek_client() -> OpenAI:
+    """Create and return a Deepseek client instance."""
+    api_key = os.getenv("DEEPSEEK_API_KEY")
+    if not api_key:
+        raise ValueError("DEEPSEEK_API_KEY not found in environment variables")
+    return OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
+
+
+def generate_question_prompt() -> str:
+    """Generate the prompt for creating a challenging LLM question."""
+    request = "Come up with a challenging, nuanced question that I can ask a number of LLMs to evaluate their intelligence. "
+    request += "Answer only with the question, no explanation."
+    return request
+
+
+def create_message(content: str, role: str = "user") -> List[Dict[str, str]]:
+    """Create a message in the format expected by the OpenAI API."""
+    return [{"role": role, "content": content}]
+
+
+def get_llm_response(client: OpenAI, model: str, messages: List[Dict[str, str]]) -> str:
+    """
+    Get a response from an LLM client.
+    
+    Args:
+        client: The OpenAI or Deepseek client instance
+        model: The model identifier string
+        messages: List of message dictionaries
+        
+    Returns:
+        The content of the response
+    """
+    response = client.chat.completions.create(
+        model=model,
+        messages=messages
+    )
+    return response.choices[0].message.content
+
+
+def generate_questions(openai_client: OpenAI, deepseek_client: OpenAI, 
+                       openai_model: str, deepseek_model: str) -> Tuple[str, str]:
+    """
+    Generate questions from both OpenAI and Deepseek models.
+    
+    Returns:
+        Tuple of (openai_question, deepseek_question)
+    """
+    prompt = generate_question_prompt()
+    messages = create_message(prompt)
+    
+    question_openai = get_llm_response(openai_client, openai_model, messages)
+    question_deepseek = get_llm_response(deepseek_client, deepseek_model, messages)
+    
+    return question_openai, question_deepseek
+
+
+def get_model_responses(openai_client: OpenAI, deepseek_client: OpenAI,
+                        openai_model: str, deepseek_model: str,
+                        question: str) -> List[str]:
+    """
+    Get responses from all models for a given question.
+    
+    Args:
+        openai_client: OpenAI client instance
+        deepseek_client: Deepseek client instance
+        openai_model: OpenAI model identifier
+        deepseek_model: Deepseek model identifier
+        question: The question to ask
+        
+    Returns:
+        List of responses from each model
+    """
+    messages = create_message(question)
+    
+    response_openai = get_llm_response(openai_client, openai_model, messages)
+    response_deepseek = get_llm_response(deepseek_client, deepseek_model, messages)
+    
+    return [response_openai, response_deepseek]
+
+
+def format_responses_for_judging(responses: List[str]) -> str:
+    """
+    Format responses with enumeration for the judge.
+    
+    Args:
+        responses: List of response strings from different models
+        
+    Returns:
+        Formatted string with enumerated responses
+    """
+    combined = ""
+    for index, answer in enumerate(responses):
+        combined += f"The answer from LLM {index + 1} is \n\n "
+        combined += answer + "\n\n"
+    return combined
+
+
+def create_judge_prompt(question: str, responses: List[str], num_competitors: int) -> str:
+    """
+    Create the judging prompt with question and responses.
+    
+    Args:
+        question: The question that was asked
+        responses: List of responses from competitors
+        num_competitors: Number of competing models
+        
+    Returns:
+        Complete judge prompt string
+    """
+    combined_responses = format_responses_for_judging(responses)
+    
+    judge_prompt = f"""You are judging a competition between {num_competitors} competitors.
+Each model has been given this question:
+
+{question}
+
+Your job is to evaluate each response for clarity and strength of argument, and rank them in order of best to worst.
+Respond with JSON, and only JSON, with the following format:
+{{"results": ["best competitor number", "second best competitor number", "third best competitor number", ...]}}
+
+Here are the responses from each competitor:
+
+{combined_responses}
+
+Now respond with the JSON with the ranked order of the competitors, nothing else. Do not include markdown formatting or code blocks."""
+    
+    return judge_prompt
+
+
+def judge_responses(client: OpenAI, model: str, judge_prompt: str) -> List[str]:
+    """
+    Have an LLM judge the responses and return rankings.
+    
+    Args:
+        client: The LLM client to use for judging
+        model: The model identifier
+        judge_prompt: The complete judging prompt
+        
+    Returns:
+        List of rankings (as strings)
+    """
+    messages = create_message(judge_prompt)
+    results = get_llm_response(client, model, messages)
+    
+    try:
+        results_dict = json.loads(results)
+        return results_dict["results"]
+    except (json.JSONDecodeError, KeyError) as e:
+        raise ValueError(f"Failed to parse judge results: {e}")
+
+
+def display_rankings(ranks: List[str], competitors: List[str]) -> None:
+    """
+    Display the final rankings.
+    
+    Args:
+        ranks: List of ranking positions (as strings)
+        competitors: List of competitor model names
+    """
+    print("\n=== Competition Results ===")
+    for index, rank in enumerate(ranks):
+        competitor = competitors[int(rank) - 1]
+        print(f"{index + 1}. {competitor}")
+
+
+def run_llm_competition(use_openai_question: bool = False) -> None:
+    """
+    Main function to run the LLM competition.
+    
+    Args:
+        use_openai_question: If True, use OpenAI's question; if False, use Deepseek's question
+    """
+    # Initialize
+    initialize_environment()
+    
+    # Create clients
+    openai_client = create_openai_client()
+    deepseek_client = create_deepseek_client()
+    
+    # Define models
+    openai_model = "gpt-4o-mini"
+    deepseek_model = "deepseek-chat"
+    
+    competitors = [openai_model, deepseek_model]
+    
+    # Generate questions
+    print("Generating questions...")
+    question_openai, question_deepseek = generate_questions(
+        openai_client, deepseek_client, openai_model, deepseek_model
+    )
+    
+    # Choose which question to use
+    question = question_openai if use_openai_question else question_deepseek
+    question_source = "OpenAI" if use_openai_question else "Deepseek"
+    
+    print(f"\nUsing question from {question_source}:")
+    print(f"{question}\n")
+    
+    # Get responses from all models
+    print("Getting responses from models...")
+    responses = get_model_responses(
+        openai_client, deepseek_client, 
+        openai_model, deepseek_model, 
+        question
+    )
+    
+    # Create judge prompt and get rankings
+    print("Judging responses...")
+    judge_prompt = create_judge_prompt(question, responses, len(competitors))
+    ranks = judge_responses(deepseek_client, deepseek_model, judge_prompt)
+    
+    # Display results
+    display_rankings(ranks, competitors)
+
+
+def run_comprehensive_competition() -> None:
+    """
+    Run competition with both questions and aggregate results.
+    """
+    initialize_environment()
+    
+    openai_client = create_openai_client()
+    deepseek_client = create_deepseek_client()
+    
+    openai_model = "gpt-4o-mini"
+    deepseek_model = "deepseek-chat"
+    
+    competitors = [openai_model, deepseek_model]
+    
+    print("Generating questions...")
+    question_openai, question_deepseek = generate_questions(
+        openai_client, deepseek_client, openai_model, deepseek_model
+    )
+    
+    all_results = {}
+    
+    for question, source in [(question_openai, "OpenAI"), (question_deepseek, "Deepseek")]:
+        print(f"\n{'=' * 50}")
+        print(f"Testing with {source} question:")
+        print(f"{question}\n")
+        
+        responses = get_model_responses(
+            openai_client, deepseek_client, 
+            openai_model, deepseek_model, 
+            question
+        )
+        
+        judge_prompt = create_judge_prompt(question, responses, len(competitors))
+        ranks = judge_responses(deepseek_client, deepseek_model, judge_prompt)
+        
+        all_results[source] = ranks
+        display_rankings(ranks, competitors)
+    
+    return all_results
+
+
+if __name__ == "__main__":
+    # Run the competition using Deepseek's question (as in original code)
+    run_llm_competition(use_openai_question=False)
+    
+    # Alternatively, run comprehensive competition with both questions:
+    # run_comprehensive_competition()
